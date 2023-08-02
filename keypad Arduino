@@ -1,0 +1,95 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Keypad.h>
+#include <Servo.h>
+
+const int ROW_NUM    = 4; // four rows
+const int COLUMN_NUM = 4; // four columns
+
+// Define the keymap for the keypad
+char keys[ROW_NUM][COLUMN_NUM] = {
+  {'4', '5', '6', 'B'},
+  {'1', '2', '3', 'A'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+
+byte pin_rows[ROW_NUM] = {9, 8, 7, 6};    // connect to the row pinouts of the keypad
+byte pin_column[COLUMN_NUM] = {5, 4, 3, 2}; // connect to the column pinouts of the keypad
+
+Keypad keypad = Keypad(makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_NUM);
+
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Address 0x27 for a 16x2 LCD
+
+Servo servo;
+const int servoPin = 12;
+const int buzzerPin = 13;
+
+// Password to be entered
+const String password = "1234"; // Replace with your desired password (with 'C' as the last character)
+
+String enteredPassword = "";
+boolean isDoorOpen = false; // Variable to track if the door is open
+
+void setup() {
+  Wire.begin(); // Initialize I2C communication
+  lcd.begin(16, 2);
+  lcd.print("Enter password:");
+  servo.attach(servoPin);
+  pinMode(buzzerPin, OUTPUT);
+  lcd.backlight(); // Turn on the backlight (always ON)
+}
+
+void loop() {
+  char key = keypad.getKey();
+  if (key) {
+    // Produce a beep sound
+    tone(buzzerPin, 1000, 100);
+
+    // Display the pressed key on LCD
+    lcd.setCursor(0, 1);
+    lcd.print("Entered: " + String(key));
+
+    // Handle the entered key (except for 'A', 'B', and 'D')
+    if (key != 'A' && key != 'B' && key != 'D' && key != 'E') {
+      enteredPassword += key;
+
+      // Clear the LCD after 1 second
+      delay(1000);
+      lcd.setCursor(0, 1);
+      lcd.print("               ");
+
+      // Check if the entered password matches the desired password
+      if (enteredPassword == password) {
+        lcd.setCursor(0, 1);
+        lcd.print("Password correct");
+
+        // Perform action when the password is correct
+        if (isDoorOpen) {
+          // If the door is open, close the door (rotate servo back to 0 degrees)
+          servo.write(0);
+          lcd.setCursor(0, 0);
+          lcd.print("Door Closed    ");
+        } else {
+          // If the door is closed, open the door (rotate servo to 90 degrees)
+          servo.write(90);
+          lcd.setCursor(0, 0);
+          lcd.print("Door Opened    ");
+        }
+
+        isDoorOpen = !isDoorOpen; // Toggle the door state
+        delay(2000); // Wait for 2 seconds
+
+        // Reset the entered password
+        enteredPassword = "";
+      } else if (enteredPassword.length() == password.length()) {
+        lcd.setCursor(0, 1);
+        lcd.print("Password wrong  ");
+        // Do any other action when the password is wrong (e.g., no servo rotation)
+
+        // Reset the entered password
+        enteredPassword = "";
+      }
+    }
+  }
+}
